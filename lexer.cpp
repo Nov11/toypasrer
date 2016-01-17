@@ -407,7 +407,6 @@ int main() {
 	init_test("{[]}");
 	printf("////////////////////test: %s\n", p);
 	check(valid_json(), p);
-
 	test(
 		"{ \"hello\" : \"world\", \"t\" : true , "\
 		"\"f\" : false, \"n\": null, \"i\":123,\"pi\": 3.1416, \"a\":[1, 2, 3] } "
