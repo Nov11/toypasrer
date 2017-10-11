@@ -1,14 +1,15 @@
+ï»¿
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "lexer.h"
 
-char* p;
+const char* p;
 int len;
 int processed_chars;
 char number[] = "-1234.56789e+1234";
-char* json_string_type;
+const char* json_string_type;
 
 void put_back() {
 	processed_chars--;
@@ -41,7 +42,7 @@ char peek_trimed() {
 	return c;
 }
 
-char* currentPosition() {
+const char* currentPosition() {
 	return p;
 }
 
@@ -49,7 +50,7 @@ int no_more_chars() {
 	return len - processed_chars ;
 }
 
-void error_msg(char* str = NULL) {
+void error_msg(const char* str = "") {
 	printf("error occured position: chars:%s processing char:%c\n%s\n", currentPosition(), *(currentPosition() - 1), str);
 }
 
@@ -118,7 +119,28 @@ int isNumber() {
 	}
 	return 0;
 }
-
+int getUvalue() {
+	int value = 0;
+	char c = 0;
+	for (int i = 0; i < 4; i++) {
+		c = nextChar();
+		if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			/*it's hex*/
+			value *= 16;
+			if (c >= '0' && c <= '9') {
+				value += c - '0';
+			}
+			else {
+				value += tolower(c) - 'a' + 10;
+			}
+		}
+		else {
+			error_msg();
+			return -1;
+		}
+	}
+	return value;
+}
 int isString() {
 	char c = trimBlankChar(NULL);
 	if (c == '"') {
@@ -134,12 +156,27 @@ int isString() {
 					/*it's ok*/
 				}
 				else if (c == 'u') {
-					for (int i = 0; i < 4; i++) {
+					//as the simple program is checking grammar only.
+					//it's not gonna extract contents.
+					//unicode support is not needed.
+					//if this support is in need, do some conversion:
+					//if code point is 0x0000~0xFFFFï¼Œ copy it.
+					//if code point is 0xD800~0xDBFF, read the second one.
+					//the second one should be in 0xDC00~0xDFFF, or the content is not valid.
+					//to extract the real code point, do the following:
+					//codepoint = 0x10000 + (H âˆ’ 0xD800) Ã— 0x400 + (L âˆ’ 0xDC00)
+					int value = getUvalue();
+					if (value == -1) { return -1; }
+
+					if (value >= 0xD800 && value <= 0XDBFF) {
+						//read next \uXXXX
 						c = nextChar();
-						if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-							/*it's hex*/
-						}
-						else {
+						if (c != '\\') { error_msg(); return -1; }
+						c = nextChar();
+						if (c != 'u') { error_msg(); return -1; }
+						int sndValue = getUvalue();
+						if (sndValue == -1) { return -1; }
+						if (sndValue < 0xDC00 || sndValue >0xDFFF) {
 							error_msg();
 							return -1;
 						}
@@ -149,7 +186,7 @@ int isString() {
 			c = nextChar();
 		}
 		if (c == '"') {
-			/*Ò»¸östringµ½ÕâÀï½áÊø*/
+			/*ä¸€ä¸ªstringåˆ°è¿™é‡Œç»“æŸ*/
 			return 0;
 		}
 		else {
@@ -205,7 +242,7 @@ int parse_array() {
 	}
 }
 
-int match(char* word) {
+int match(const char* word) {
 	char c = trimBlankChar(NULL);
 	for (size_t i = 0; i < strlen(word); i++) {
 		if (word[i] != c) {
@@ -329,7 +366,7 @@ int parse_object() {
 		return -1;
 	}
 }
-void check(int input, char* s) {
+void check(int input, const char* s) {
 	if (input == 0) {
 		printf("%s is valid %s\n", s, json_string_type);
 	}
@@ -337,7 +374,7 @@ void check(int input, char* s) {
 		printf("%s is not valid %s\n", s, json_string_type);
 	}
 }
-void init_test(char* str) {
+void init_test(const char* str) {
 	p = str;
 	len = strlen(p);
 	processed_chars = 0;
@@ -371,7 +408,7 @@ int valid_json() {
 	}
 }
 
-void test(char* test_str) {
+void test(const char* test_str) {
 	init_test(test_str);
 	printf("===>>>>>test: %s\n", p);
 	check(valid_json(), p);
@@ -415,5 +452,8 @@ int main() {
 	test("[-1234567890123456789]");
 	test("[1234567890123456789]");
 	test("[\"\\\"\\\\/\\b\\f\\n\\r\\t\"]");
+
+	test("\"\\uD834\\uDD1E\"");
+	test("\"\\uD834\\uFD1E\"");
 	return 0;
 }
